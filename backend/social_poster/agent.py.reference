@@ -88,14 +88,9 @@ BACKEND_PUBLIC_ORIGIN = os.environ.get("BACKEND_PUBLIC_ORIGIN", "http://localhos
 # are all flash. One cost experiment: move the two agents that don't need
 # deep reasoning (research summarisation, the routing orchestrator) to
 # flash-lite, keep draft_agent on flash where quality shows most.
-def _resolve_model(model_name: str) -> str:
-    if model_name == "gemini-flash-latest":
-        return "gemini-2.5-flash"
-    return model_name
-
-RESEARCH_MODEL = _resolve_model(os.environ.get("RESEARCH_MODEL", "gemini-flash-latest"))
-DRAFT_MODEL = _resolve_model(os.environ.get("DRAFT_MODEL", "gemini-flash-latest"))
-ORCHESTRATOR_MODEL = _resolve_model(os.environ.get("ORCHESTRATOR_MODEL", "gemini-flash-latest"))
+RESEARCH_MODEL = os.environ.get("RESEARCH_MODEL", "gemini-flash-latest")
+DRAFT_MODEL = os.environ.get("DRAFT_MODEL", "gemini-flash-latest")
+ORCHESTRATOR_MODEL = os.environ.get("ORCHESTRATOR_MODEL", "gemini-flash-latest")
 
 # --- Specialist: research -----------------------------------------------------
 # google_search stays isolated in its own agent (Agent Platform rejects mixing the
