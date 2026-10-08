@@ -3,7 +3,9 @@
 Run from the repo root:  uv run uvicorn backend.main:app --port 8000
 """
 
+import os
 import pathlib
+import re
 
 from ag_ui_adk import ADKAgent, add_adk_fastapi_endpoint
 from dotenv import load_dotenv
@@ -25,10 +27,34 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Use VertexAiSessionService & VertexAiMemoryBankService on Agent Runtime
+# (detected via APP_URL), and keep in-memory defaults when running locally.
+session_service = None
+memory_service = None
+app_url = os.environ.get("APP_URL", "")
+match = re.search(r"projects/([^/]+)/locations/([^/]+)/reasoningEngines/([^/]+)", app_url)
+if match:
+    from google.adk.memory import VertexAiMemoryBankService
+    from google.adk.sessions import VertexAiSessionService
+
+    project, location, engine_id = match.groups()
+    session_service = VertexAiSessionService(
+        project=project,
+        location=location,
+        agent_engine_id=engine_id,
+    )
+    memory_service = VertexAiMemoryBankService(
+        project=project,
+        location=location,
+        agent_engine_id=engine_id,
+    )
+
 adk_agent = ADKAgent(
     adk_agent=root_agent,
     app_name="social_poster",
     user_id="devcamp-user",  # single-user POC; extract from auth in real apps
+    session_service=session_service,
+    memory_service=memory_service,
 )
 
 add_adk_fastapi_endpoint(app, adk_agent, path="/api/adk")

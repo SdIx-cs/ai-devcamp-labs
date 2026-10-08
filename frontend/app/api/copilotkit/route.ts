@@ -6,18 +6,20 @@ import {
 import { HttpAgent } from "@ag-ui/client";
 import { NextRequest } from "next/server";
 
-// Bridges the browser to the ADK backend's AG-UI endpoint.
-const runtime = new CopilotRuntime({
-  agents: {
-    social_poster: new HttpAgent({
-      url: process.env.ADK_BACKEND_URL ?? "http://localhost:8000/api/adk",
-    }),
-  },
-});
+function getRuntime() {
+  const port = process.env.PORT || "3000";
+  return new CopilotRuntime({
+    agents: {
+      social_poster: new HttpAgent({
+        url: process.env.ADK_BACKEND_URL || `http://127.0.0.1:${port}/api/adk`,
+      }),
+    },
+  });
+}
 
 export const POST = async (req: NextRequest) => {
   const { handleRequest } = copilotRuntimeNextJSAppRouterEndpoint({
-    runtime,
+    runtime: getRuntime(),
     serviceAdapter: new ExperimentalEmptyAdapter(),
     endpoint: "/api/copilotkit",
   });

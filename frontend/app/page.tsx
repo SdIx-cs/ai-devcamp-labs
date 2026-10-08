@@ -59,6 +59,16 @@ function Header() {
             <span className="avatar-fallback">{user.name[0]?.toUpperCase()}</span>
           )}
           <span>{user.name}</span>
+          <button
+            className="signout-button"
+            onClick={() => {
+              localStorage.clear();
+              sessionStorage.clear();
+              window.location.reload();
+            }}
+          >
+            New chat
+          </button>
           <button className="signout-button" onClick={signOut}>
             Sign out
           </button>

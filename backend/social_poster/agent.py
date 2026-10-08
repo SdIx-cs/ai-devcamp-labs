@@ -21,7 +21,7 @@ from google.adk.agents.remote_a2a_agent import RemoteA2aAgent
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.adk.skills import load_skill_from_dir
-from google.adk.tools import google_search
+from google.adk.tools import google_search, load_memory
 from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.base_tool import BaseTool
 from google.adk.tools.mcp_tool import McpToolset
@@ -336,6 +336,13 @@ if MEMORY_AGENT_CARD_URL:
         agent_card=MEMORY_AGENT_CARD_URL,
     )
 
+# Memory Bank is active on Agent Runtime (detected via APP_URL) or if configured
+use_memory_bank = bool(
+    re.search(r"projects/[^/]+/locations/[^/]+/reasoningEngines/[^/]+", os.environ.get("APP_URL", ""))
+    or os.environ.get("AGENT_ENGINE_ID")
+    or os.environ.get("USE_MEMORY_BANK", "").lower() in ("true", "1")
+)
+
 # --- Posting toolsets -----------------------------------------------------
 def _linkedin_connection() -> StdioConnectionParams:
     return StdioConnectionParams(
@@ -478,6 +485,7 @@ _TOOL_STAGES = {
     research_agent.name: "researching",
     draft_agent.name: "drafting",
     "memory_agent": "consulting_memory",
+    "load_memory": "consulting_memory",
 }
 
 
@@ -539,18 +547,39 @@ def _track_stage(
     return None  # never modify the tool result
 
 
-def _stage_after_agent(callback_context: CallbackContext) -> None:
+async def _stage_after_agent(callback_context: CallbackContext) -> None:
     # A turn that ends mid-pipeline is waiting on the user (draft approval).
     if callback_context.state.get("pipeline_stage") in ("researching", "drafting"):
         callback_context.state["pipeline_stage"] = "awaiting_approval"
 
+    if use_memory_bank and callback_context.state.get("pipeline_stage") == "posted":
+        if callback_context.state.get("memory_ingested"):
+            return  # once per conversation, not once per turn
+        await callback_context.add_session_to_memory()
+        callback_context.state["memory_ingested"] = True
+
 
 # --- Orchestrator -------------------------------------------------------------
-_MEMORY_ROUTING = """
+if use_memory_bank and memory_agent:
+    _MEMORY_ROUTING = """
+0. FIRST, before researching or drafting, consult memory using load_memory(query="Building in public hashtags posting style") and ask memory_agent what the user has
+    posted about before, their style preferences, and past instructions; weave that into the draft
+    brief so the new post sounds like them, follows their preferences, and doesn't repeat old topics.
+"""
+elif use_memory_bank:
+    _MEMORY_ROUTING = """
+0. FIRST, before researching or drafting, consult memory using load_memory(query="Building in public hashtags posting style") to check what the user has
+    posted about before, their style preferences, and past instructions; weave that into the draft
+    brief so the new post sounds like them, follows their preferences, and doesn't repeat old topics.
+"""
+elif memory_agent:
+    _MEMORY_ROUTING = """
 0. FIRST, before researching or drafting, ask memory_agent what the user has
     posted about before and how they phrase things; weave that into the draft
     brief so the new post sounds like them and doesn't repeat old topics.
-""" if memory_agent else ""
+"""
+else:
+    _MEMORY_ROUTING = ""
 
 if use_buffer and use_gcs:
     _BUFFER_IMAGE_NOTE = """
@@ -666,6 +695,7 @@ Posting rules (strict):
   reported as posted/published directly.
 """,
     tools=[
+        *([load_memory] if use_memory_bank else []),
         *([AgentTool(agent=memory_agent)] if memory_agent else []),
         AgentTool(agent=research_agent),
         AgentTool(agent=draft_agent),
