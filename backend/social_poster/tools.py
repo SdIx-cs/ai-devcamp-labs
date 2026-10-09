@@ -232,25 +232,33 @@ def use_provided_image_url(url: str) -> dict:
     return {"status": "success", "url": url}
 
 
-def check_text_length(text: str, limit: int) -> dict:
-    """Checks a draft's exact character count against a platform's limit.
+def check_text_length(text: str, limit: int = 0) -> dict:
+    """Checks a draft's exact character count and word count, optionally against a platform limit.
 
     LLMs are unreliable at counting their own generated text's length by eye
-    (token boundaries don't map to characters) — call this instead of
-    guessing, especially for X's hard 280-character cap.
+    (token boundaries don't map to characters or words) and frequently hallucinate counts.
+    Call this tool to verify exact character and word counts.
 
     Args:
-        text: The exact final draft text to measure.
-        limit: The platform's character limit (e.g. 280 for X).
+        text: The exact text to measure.
+        limit: Optional platform character limit (e.g. 280 for X, 3000 for LinkedIn). 0 if unconstrained.
 
     Returns:
-        dict with 'length', 'limit', 'within_limit', and 'over_by' (0 if fine).
+        dict with 'character_count', 'word_count', 'length', and limit details if limit > 0.
     """
-    length = len(text)
-    return {
+    char_count = len(text)
+    word_count = len(text.split())
+    result = {
         "status": "success",
-        "length": length,
-        "limit": limit,
-        "within_limit": length <= limit,
-        "over_by": max(0, length - limit),
+        "character_count": char_count,
+        "word_count": word_count,
+        "length": char_count,
     }
+    if limit > 0:
+        result.update({
+            "limit": limit,
+            "within_limit": char_count <= limit,
+            "over_by": max(0, char_count - limit),
+        })
+    return result
+

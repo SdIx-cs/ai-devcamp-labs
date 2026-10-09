@@ -338,8 +338,12 @@ Rules:
      description, and ACTUALLY CALL the tool — never write a placeholder
      like "(Image: ...)" or describe the image in the post text instead of
      calling it. The image is a separate attachment, not part of the
-     post's words.{_GCS_UPLOAD_STEP}
-4. Return ONLY the draft text (with no image caption or placeholder in it)
+4. Length and word count verification: LLMs are unreliable at counting characters
+   and words by eye. When drafting for a platform with limits (e.g., X's 280-char
+   cap) or whenever the user specifies a length or word constraint, ALWAYS call
+   check_text_length to verify the exact count before presenting the draft.
+   If it exceeds the limit, revise and re-check until it passes.
+5. Return ONLY the draft text (with no image caption or placeholder in it)
    and the image path/URL if any — no commentary about approvals or posting;
    the orchestrator handles that.""",
     tools=[
@@ -761,6 +765,7 @@ Posting rules (strict):
   published, and do not describe the post as sent, live, or successful. Only
   name the platform the tool actually posted to — never one you were asked
   for but did not use.
+- If the user asks for character count, word count, or length of a post or draft, call check_text_length instead of guessing.
 """,
     tools=[
         *([AgentTool(agent=memory_agent)] if memory_agent else []),
@@ -768,6 +773,7 @@ Posting rules (strict):
         AgentTool(agent=research_agent),
         AgentTool(agent=draft_agent),
         guardrails.redact_pii_text,
+        check_text_length,
         *([linkedin_toolset, linkedin_post_toolset] if use_linkedin else []),
         *([buffer_toolset, buffer_post_toolset] if use_buffer else []),
     ],
